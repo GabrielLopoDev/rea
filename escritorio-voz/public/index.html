@@ -674,7 +674,7 @@ function pedirAudio(texto, id) {
   return fetch('/api/voz', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pin': pin || '' }, body: JSON.stringify({ texto, quem: id }) })
     .then(r => { if (r.status === 501) vozServidor = false; return r.ok ? r.blob() : null; }).catch(() => null);
 }
-function calar() { if (audioAtual) { audioAtual.pause(); audioAtual = null; } window.calar(); }
+function calar() { if (audioAtual) { audioAtual.pause(); audioAtual = null; } if (window.speechSynthesis) speechSynthesis.cancel(); }
 async function falar(texto, id, audioPronto) {
   const blob = await (audioPronto || pedirAudio(texto, id));
   if (!blob) return falarTexto(texto, id);
