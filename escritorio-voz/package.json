@@ -1,0 +1,8 @@
+{
+  "name": "escritorio-voz",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0"
+  }
+}

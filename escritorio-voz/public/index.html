@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Escritório Koizas do Lar</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: cena 3D em tela cheia; interface flutua por cima (marca no topo, vistas embaixo, painel do setor à direita / folha inferior no celular). */
+:root {
+  --sky: #CFE3EE;
+  --ink: #1F2328;
+  --paper: #FFFFFF;
+  --mist: #F5F5F4;
+  --muted: #5E656D;
+  --line: #E4E4E2;
+  --red: #C8232B;
+  --red-deep: #A51C23;
+  --gold: #F2B32B;
+  --gold-ink: #3A2408;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+html, body { height: 100%; }
+body { background: var(--sky); color: var(--ink); font-family: var(--body); overflow: hidden; }
+#cena { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+
+.ui {
+  position: fixed; inset: 0; pointer-events: none;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: calc(14px + env(safe-area-inset-top, 0px)) calc(14px + env(safe-area-inset-bottom, 0px));
+  display: grid; grid-template-rows: auto 1fr auto; gap: 12px;
+}
+.ui > * { pointer-events: auto; }
+.ui > div:empty { pointer-events: none; }
+.topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; pointer-events: none; }
+.topo > * { pointer-events: auto; }
+
+.marca {
+  background: var(--paper); border-radius: 14px; padding: 12px 16px 13px;
+  box-shadow: 0 6px 24px rgba(31, 35, 40, .12); max-width: 340px;
+  border-top: 4px solid var(--red);
+}
+.eyebrow { margin: 0; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--red); font-weight: 700; }
+.marca h1 { margin: 2px 0 4px; font-family: var(--display); font-weight: 800; font-size: 26px; line-height: 1.05; letter-spacing: -.01em; }
+.resumo { margin: 0; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.resumo b { color: var(--ink); }
+.setores { list-style: none; margin: 10px 0 0; padding: 10px 0 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+.setores button {
+  all: unset; cursor: pointer; display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500;
+  padding: 3px 4px; border-radius: 6px; color: var(--ink);
+}
+.setores button:hover { background: var(--mist); }
+.setores button:focus-visible { outline: 2px solid var(--red); outline-offset: 1px; }
+.setores i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+.dica {
+  margin: 0; font-size: 12.5px; color: var(--ink); background: rgba(255, 255, 255, .78);
+  padding: 7px 11px; border-radius: 999px; backdrop-filter: blur(6px); max-width: 260px; text-align: right;
+}
+
+.vistas {
+  justify-self: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px;
+  background: var(--ink); padding: 5px; border-radius: 14px; box-shadow: 0 8px 28px rgba(31, 35, 40, .28);
+}
+.vistas button {
+  all: unset; cursor: pointer; color: #E9EAEC; font-weight: 600; font-size: 14px;
+  padding: 9px 14px; border-radius: 10px; white-space: nowrap;
+}
+.vistas button:hover { background: rgba(255, 255, 255, .1); }
+.vistas button:focus-visible { outline: 2px solid var(--gold); }
+.vistas button[aria-pressed="true"] { background: var(--red); color: #fff; }
+.vistas button[data-vista="tour"] { color: var(--gold); }
+.vistas button[data-vista="tour"][aria-pressed="true"] { background: var(--gold); color: var(--gold-ink); }
+
+#painel {
+  position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+  width: 330px; max-height: calc(100% - 120px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow: auto;
+  background: var(--paper); border-radius: 16px; box-shadow: 0 10px 36px rgba(31, 35, 40, .2);
+  padding: 18px 18px 16px;
+}
+#painel .faixa { height: 6px; border-radius: 3px; margin-bottom: 12px; }
+#painel .tipo { margin: 0; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+#painel h2 { margin: 2px 0 2px; font-family: var(--display); font-size: 24px; font-weight: 800; line-height: 1.1; text-wrap: balance; }
+#painel .sub { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+#painel p.missao { margin: 0 0 14px; font-size: 14.5px; line-height: 1.5; }
+#painel h3 { margin: 14px 0 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+#painel ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+#painel li.vaga { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; padding: 8px 10px; border: 1px dashed #C9CCCF; border-radius: 9px; }
+#painel li.vaga span.tag { font-size: 11.5px; font-weight: 700; color: var(--muted); background: var(--mist); padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
+#painel .apis { display: flex; flex-wrap: wrap; gap: 6px; }
+#painel .apis span { font-size: 12.5px; font-weight: 600; padding: 4px 9px; border-radius: 999px; background: var(--mist); border: 1px solid var(--line); }
+#painel .fechar {
+  all: unset; cursor: pointer; position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 8px;
+  display: grid; place-items: center; font-size: 20px; color: var(--muted);
+}
+#painel .fechar:hover { background: var(--mist); color: var(--ink); }
+#painel .fechar:focus-visible { outline: 2px solid var(--red); }
+#painel .nota { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+
+#carregando {
+  position: fixed; inset: 0; display: grid; place-items: center; background: var(--sky);
+  font-family: var(--display); font-size: 20px; font-weight: 600; color: var(--ink); text-align: center; padding: 24px;
+}
+
+[hidden] { display: none !important; }
+
+@media (max-width: 640px) {
+  .marca { padding: 10px 13px 11px; max-width: 230px; }
+  .marca h1 { font-size: 21px; }
+  .setores { display: none; }
+  .dica { display: none; }
+  .vistas button { padding: 8px 10px; font-size: 13px; }
+  #painel {
+    top: auto; left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px));
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 48%;
+  }
+}
+
+#painel .conversa { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+#painel .msgs { max-height: 34vh; overflow-y: auto; display: grid; gap: 6px; margin: 8px 0; }
+#painel .msgs p { margin: 0; font-size: 14px; line-height: 1.45; padding: 7px 10px; border-radius: 10px; background: var(--mist); }
+#painel .msgs p.eu { background: #E8F0E4; justify-self: end; }
+#painel .falar { width: 100%; padding: 12px; border: 0; border-radius: 12px; font: 700 15px var(--display, inherit); color: #fff; cursor: pointer; }
+#painel .falar.ouvindo { animation: pulsa 1s infinite alternate; }
+@keyframes pulsa { to { filter: brightness(1.25); } }
+#painel form.digitar { display: flex; gap: 6px; margin-top: 8px; }
+#painel form.digitar input { flex: 1; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; font: inherit; font-size: 14px; }
+#painel form.digitar button { padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--mist); font: inherit; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<canvas id="cena" tabindex="0" aria-label="Escritório 3D da Koizas do Lar"></canvas>
+
+<div class="ui">
+  <div class="topo">
+    <header class="marca">
+      <p class="eyebrow">Escritório IA · fase 2</p>
+      <h1>Koizas do Lar</h1>
+      <p class="resumo"><b id="n-setores">8</b> setores · <b id="n-mesas">32</b> mesas · <b id="n-func">0</b> funcionários</p>
+      <ul class="setores" id="lista-setores"></ul>
+    </header>
+    <p class="dica">Arraste para girar · role ou use a pinça para zoom · toque num setor para ver as vagas</p>
+  </div>
+  <div></div>
+  <nav class="vistas" aria-label="Vistas do escritório">
+    <button type="button" data-vista="geral" aria-pressed="true">Visão geral</button>
+    <button type="button" data-vista="terreo" aria-pressed="false">Térreo</button>
+    <button type="button" data-vista="reuniao" aria-pressed="false">Sala de reunião</button>
+    <button type="button" data-vista="tour" aria-pressed="false">Tour</button>
+  </nav>
+</div>
+
+<aside id="painel" hidden aria-live="polite"></aside>
+<div id="carregando">Montando o escritório…</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script>
+  window.addEventListener('error', () => {
+    const c = document.getElementById('carregando');
+    if (c && !c.hidden) c.textContent = 'Não consegui carregar o motor 3D. Verifique a conexão e recarregue a página.';
+  });
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// as placas e a TV são desenhadas em canvas: espera as fontes (no máximo 2,5 s)
+try {
+  await Promise.race([
+    Promise.all(['800 64px "Bricolage Grotesque"', '700 64px "Bricolage Grotesque"', '500 40px "Figtree"', '700 30px "Figtree"'].map(f => document.fonts.load(f))),
+    new Promise(r => setTimeout(r, 2500)),
+  ]);
+} catch (e) { /* segue com a fonte reserva */ }
+
+// ---------- Dados do escritório (os funcionários entram aqui na próxima fase) ----------
+const SETORES = [
+  { id: 'mercado', nome: 'Estudo de mercado', sub: 'Tendências, concorrentes e preços', cor: '#2F5D8A', piso: '#C9DCEF',
+    missao: 'Descobrir o que vende e quanto os concorrentes cobram, e com os custos do Paulo dizer se vale a pena vender nos marketplaces.',
+    tarefas: ['Produtos em alta (Mercado Livre)', 'Preço dos concorrentes', 'Vale a pena? (com o Paulo)'] },
+  { id: 'fornecedores', nome: 'Fornecedores', sub: 'Cotação de preços', cor: '#1E7F6E', piso: '#C4E6DE',
+    missao: 'Achar fornecedores, pedir cotação por e-mail e WhatsApp e passar os custos para o Lucas. Não fecha compra: isso é com o Gabriel.',
+    tarefas: ['Achar fornecedores novos', 'Pedir cotação (e-mail e WhatsApp)', 'Tabela de custos para o Lucas'] },
+  { id: 'arte', nome: 'Arte visual', sub: 'Fotos, vídeos e identidade', cor: '#6B4FA0', piso: '#DCD0EE',
+    missao: 'Cuidar de toda a parte visual da Koizas do Lar: fotos dos produtos, vídeos e a cara da marca.',
+    tarefas: ['Fotos dos produtos', 'Vídeos para TikTok e Reels', 'Identidade visual da marca'] },
+];
+const EQUIPE = {
+  mercado: [{ nome: 'Lucas Ferraz', cargo: 'Analista de mercado' }],
+  fornecedores: [{ nome: 'Paulo Henrique', cargo: 'Caçador de fornecedores' }],
+  arte: [{ nome: 'Camila Andrade', cargo: 'Diretora de arte (fotos e vídeos)' }],
+};
+SETORES.forEach(s => { s.funcionarios = (EQUIPE[s.id] || []).map((f, i) => ({ ...f, id: s.id + '-' + i, status: 'Pronto para começar' })); s.mesas = []; });
+const MESAS_POR_SETOR = 4;
+const LUGARES_REUNIAO = 12;
+
+const reduzMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- Cena ----------
+const canvas = document.getElementById('cena');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, window.innerWidth < 700 ? 1.5 : 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = false;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.autoUpdate = false; // sombras só são recalculadas quando algo muda
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#CFE3EE');
+scene.fog = new THREE.Fog('#CFE3EE', 90, 210);
+
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
+camera.position.set(42, 32, 40);
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 2, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.minDistance = 1.5;
+controls.maxDistance = 130;
+
+scene.add(new THREE.HemisphereLight('#ffffff', '#9fb38a', 1.6));
+const sol = new THREE.DirectionalLight('#fff4e2', 3.2);
+sol.position.set(34, 48, 22);
+sol.castShadow = true;
+sol.shadow.mapSize.set(1536, 1536);
+Object.assign(sol.shadow.camera, { left: -42, right: 42, top: 42, bottom: -42, near: 1, far: 140 });
+sol.shadow.bias = -0.001;
+sol.shadow.normalBias = 0.04;
+scene.add(sol);
+
+// ---------- Utilidades ----------
+const matCache = new Map();
+function mat(cor, extra = {}) {
+  const chave = cor + JSON.stringify(extra);
+  if (!matCache.has(chave)) matCache.set(chave, new THREE.MeshStandardMaterial({ color: cor, roughness: 0.82, metalness: 0.02, ...extra }));
+  return matCache.get(chave);
+}
+function caixa(w, h, d, cor, x, y, z, pai = scene, extra) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof cor === 'string' ? mat(cor, extra) : cor);
+  m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true;
+  pai.add(m);
+  return m;
+}
+function cilindro(rt, rb, h, cor, x, y, z, pai = scene, seg = 14) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat(cor));
+  m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+  pai.add(m); return m;
+}
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const aleatorio = rng(17);
+
+function caminhoArredondado(g, x, y, w, h, r) {
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+function texturaCanvas(w, h, desenhar) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  desenhar(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
+}
+function etiqueta(texto, fundo, frente = '#ffffff', altura = 1) {
+  const fonte = '700 128px "Bricolage Grotesque", "Segoe UI", sans-serif';
+  const medir = document.createElement('canvas').getContext('2d'); medir.font = fonte;
+  const largura = Math.ceil(medir.measureText(texto).width) + 160;
+  const tex = texturaCanvas(largura, 240, (g, w, h) => {
+    g.fillStyle = fundo; caminhoArredondado(g, 8, 8, w - 16, h - 16, 68); g.fill();
+    g.font = fonte; g.fillStyle = frente; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(texto, w / 2, h / 2 + 6);
+  });
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  s.scale.set(altura * largura / 240, altura, 1);
+  return s;
+}
+
+const vidro = new THREE.MeshStandardMaterial({ color: '#BFE0F0', transparent: true, opacity: 0.2, roughness: 0.05, metalness: 0.1, depthWrite: false, side: THREE.DoubleSide });
+const caixilho = '#2B2F36';
+
+function paredeVidro(x1, z1, x2, z2, y0, alt, pai, vaos = []) {
+  const dx = x2 - x1, dz = z2 - z1, comp = Math.hypot(dx, dz), ang = Math.atan2(dz, dx);
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(comp, alt), vidro);
+  p.position.set((x1 + x2) / 2, y0 + alt / 2, (z1 + z2) / 2); p.rotation.y = -ang;
+  pai.add(p);
+  const n = Math.round(comp / 2.5);
+  for (let i = 0; i <= n; i++) {
+    const k = i / n, x = x1 + dx * k, z = z1 + dz * k;
+    if (vaos.some(([a, b]) => (Math.abs(dx) > 0 ? x : z) > a && (Math.abs(dx) > 0 ? x : z) < b)) continue;
+    caixa(0.07, alt, 0.07, caixilho, x, y0 + alt / 2, z, pai);
+  }
+  caixa(Math.abs(dx) + 0.07, 0.07, Math.abs(dz) + 0.07, caixilho, (x1 + x2) / 2, y0 + alt, (z1 + z2) / 2, pai);
+}
+
+function cadeira(x, y, z, rotY, cor, pai) {
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rotY;
+  caixa(0.52, 0.08, 0.5, cor, 0, 0.47, 0, g);
+  caixa(0.52, 0.58, 0.07, cor, 0, 0.8, -0.24, g);
+  cilindro(0.035, 0.035, 0.42, '#3A3F46', 0, 0.23, 0, g, 8);
+  cilindro(0.26, 0.26, 0.04, '#3A3F46', 0, 0.03, 0, g, 12);
+  pai.add(g); return g;
+}
+function arvore(x, z, escala = 1, pai = scene) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.scale.setScalar(escala);
+  cilindro(0.16, 0.22, 1.6, '#7A5A3A', 0, 0.8, 0, g, 7);
+  const tons = ['#5E9E4B', '#6BAF52', '#4F8F42'];
+  const copa = new THREE.Mesh(new THREE.IcosahedronGeometry(1.25, 0), mat(tons[Math.floor(aleatorio() * 3)], { flatShading: true }));
+  copa.position.y = 2.4; copa.castShadow = true; g.add(copa);
+  const copa2 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.85, 0), mat(tons[Math.floor(aleatorio() * 3)], { flatShading: true }));
+  copa2.position.set(0.5, 3.1, 0.2); copa2.castShadow = true; g.add(copa2);
+  pai.add(g); return g;
+}
+function vaso(x, y, z, pai = scene) {
+  cilindro(0.32, 0.26, 0.55, '#E9E4DC', x, y + 0.275, z, pai, 12);
+  const f = new THREE.Mesh(new THREE.IcosahedronGeometry(0.45, 0), mat('#5E9E4B', { flatShading: true }));
+  f.position.set(x, y + 0.85, z); f.castShadow = true; pai.add(f);
+}
+
+// ---------- Entorno ----------
+const chao = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), mat('#93C273'));
+chao.rotation.x = -Math.PI / 2; chao.receiveShadow = true; scene.add(chao);
+
+const RX = 31, RZ = 23, LR = 5; // anel de ruas
+const asfalto = '#5B6168';
+caixa(2 * RX + LR, 0.04, LR, asfalto, 0, 0.02, RZ);
+caixa(2 * RX + LR, 0.04, LR, asfalto, 0, 0.02, -RZ);
+caixa(LR, 0.04, 2 * RZ + LR, asfalto, RX, 0.02, 0);
+caixa(LR, 0.04, 2 * RZ + LR, asfalto, -RX, 0.02, 0);
+caixa(LR, 0.04, 140, asfalto, 0, 0.015, RZ + 70); // avenida de saída
+for (let x = -RX + 2; x < RX - 1; x += 4) { caixa(1.8, 0.05, 0.15, '#F4F1E8', x, 0.03, RZ); caixa(1.8, 0.05, 0.15, '#F4F1E8', x, 0.03, -RZ); }
+for (let z = -RZ + 2; z < RZ - 1; z += 4) { caixa(0.15, 0.05, 1.8, '#F4F1E8', RX, 0.03, z); caixa(0.15, 0.05, 1.8, '#F4F1E8', -RX, 0.03, z); }
+caixa(50, 0.1, 34, '#E3DFD8', 0, 0.05, 0); // calçada / praça
+caixa(4, 0.11, 5, '#D6D1C8', 14, 0.06, 18.5); // acesso à porta
+
+// estacionamento
+for (let i = 0; i < 7; i++) caixa(0.12, 0.12, 4.2, '#F4F1E8', -22 + i * 2.8, 0.1, 15);
+
+for (let i = 0; i < 46; i++) {
+  let x, z;
+  do { x = (aleatorio() - 0.5) * 120; z = (aleatorio() - 0.5) * 100; }
+  while ((Math.abs(x) < 27 && Math.abs(z) < 19) || (Math.abs(Math.abs(x) - RX) < 5 && Math.abs(z) < RZ + 4) || (Math.abs(Math.abs(z) - RZ) < 5 && Math.abs(x) < RX + 4) || (Math.abs(x) < 5 && z > RZ));
+  arvore(x, z, 0.8 + aleatorio() * 0.6);
+}
+for (const [x, z] of [[-23, -16], [-23, 16], [23, -16], [23, 16], [-8, 16.5], [4, 16.5]]) arvore(x, z, 0.9);
+
+// prédios vizinhos ao fundo
+const vizinhos = [[-70, -55, 12, 30], [-48, -62, 10, 22], [-20, -70, 14, 34], [10, -66, 12, 18], [40, -60, 16, 28], [68, -45, 12, 24], [-72, 10, 12, 16], [72, 20, 14, 20], [-60, 52, 12, 14], [55, 55, 14, 18]];
+for (const [x, z, w, h] of vizinhos) {
+  const tom = ['#C9CDD3', '#D8D4CC', '#BFC6CF', '#E2DED7'][Math.floor(aleatorio() * 4)];
+  caixa(w, h, w * 0.8, tom, x, h / 2, z);
+  for (let y = 3; y < h - 1; y += 3) caixa(w + 0.05, 0.9, w * 0.8 + 0.05, '#9DB4C4', x, y, z);
+}
+
+// carros
+const carros = [];
+const coresCarro = ['#C8232B', '#F2B32B', '#F4F4F2', '#2F5D8A', '#3A3F46'];
+for (let i = 0; i < 5; i++) {
+  const g = new THREE.Group();
+  caixa(2.2, 0.55, 1.05, coresCarro[i], 0, 0.45, 0, g);
+  caixa(1.2, 0.45, 0.95, coresCarro[i], -0.1, 0.92, 0, g);
+  caixa(1.22, 0.32, 0.97, '#9DB4C4', -0.1, 0.95, 0, g, { roughness: 0.2 });
+  for (const [a, b] of [[0.7, 0.5], [0.7, -0.5], [-0.7, 0.5], [-0.7, -0.5]]) { const r = cilindro(0.22, 0.22, 0.18, '#22252A', a, 0.22, b, g, 10); r.rotation.x = Math.PI / 2; }
+  g.traverse(o => { o.castShadow = false; }); scene.add(g); carros.push({ g, s: i * 41.6, v: 4 + i * 0.6 });
+}
+const PER = 4 * RX + 4 * RZ;
+function posNaRua(s) {
+  s = ((s % PER) + PER) % PER; const off = 1.2;
+  if (s < 2 * RX) return [-RX + s, RZ + off, 0];
+  s -= 2 * RX; if (s < 2 * RZ) return [RX + off, RZ - s, Math.PI / 2];
+  s -= 2 * RZ; if (s < 2 * RX) return [RX - s, -RZ - off, Math.PI];
+  s -= 2 * RX; return [-RX - off, -RZ + s, -Math.PI / 2];
+}
+
+// ---------- Prédio ----------
+const BW = 40, BD = 24, H = 4.2; // largura, profundidade, pé-direito
+const terreo = new THREE.Group(); scene.add(terreo);
+const andar = new THREE.Group(); scene.add(andar); // laje + terraço + sala de reunião
+
+caixa(BW, 0.3, BD, '#EDEBE7', 0, 0.15, 0, terreo);
+for (let x = -BW / 2; x <= BW / 2; x += 10) for (const z of [-BD / 2, BD / 2]) caixa(0.45, H, 0.45, '#F4F4F2', x, H / 2 + 0.3, z, terreo);
+for (const x of [-BW / 2, BW / 2]) caixa(0.45, H, 0.45, '#F4F4F2', x, H / 2 + 0.3, 0, terreo);
+paredeVidro(-BW / 2, BD / 2, BW / 2, BD / 2, 0.3, H - 0.1, terreo, [[12.4, 15.6]]);
+paredeVidro(-BW / 2, -BD / 2, BW / 2, -BD / 2, 0.3, H - 0.1, terreo);
+paredeVidro(-BW / 2, -BD / 2, -BW / 2, BD / 2, 0.3, H - 0.1, terreo);
+paredeVidro(BW / 2, -BD / 2, BW / 2, BD / 2, 0.3, H - 0.1, terreo);
+caixa(BW, 0.04, 0.6, '#C9C4BB', 0, 0.31, 0, terreo); // corredor central
+
+const pickaveis = [];
+const aneis = [];
+const etiquetasTerreo = [];
+
+SETORES.forEach((s, i) => {
+  const linha = [0, 0, 1][i];
+  const cx = [-15.5, 0, -7.75][i], cz = linha === 0 ? -6 : 6;
+  s.centro = new THREE.Vector3(cx, 0.3, cz);
+  const zona = new THREE.Group(); zona.userData.setor = s.id; terreo.add(zona);
+  caixa(6.4, 0.03, 10, s.piso, cx, 0.315, cz, zona);
+  caixa(6.4, 0.035, 0.18, s.cor, cx, 0.32, cz + (linha === 0 ? 4.91 : -4.91), zona);
+  // 4 mesas em duas ilhas (costas com costas)
+  let n = 0;
+  for (const ox of [-1.55, 1.55]) {
+    for (const lado of [-1, 1]) {
+      const dz = cz + (linha === 0 ? -1 : 1) * 0.6 + lado * 0.42;
+      const mz = dz;
+      caixa(1.6, 0.05, 0.8, '#F7F5F2', cx + ox, 1.05, mz, zona);
+      for (const lx of [-0.74, 0.74]) caixa(0.05, 0.72, 0.7, '#B9BDC2', cx + ox + lx, 0.67, mz, zona);
+      const mon = caixa(0.72, 0.42, 0.04, '#22262C', cx + ox, 1.36, mz - lado * 0.28, zona);
+      mon.rotation.y = lado > 0 ? 0 : Math.PI;
+      caixa(0.06, 0.2, 0.06, '#3A3F46', cx + ox, 1.15, mz - lado * 0.3, zona);
+      const tela = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.36), new THREE.MeshStandardMaterial({ color: '#2A2F36', emissive: s.cor, emissiveIntensity: 0.08 }));
+      tela.position.set(cx + ox, 1.36, mz - lado * 0.28 + lado * 0.022); tela.rotation.y = lado > 0 ? 0 : Math.PI; zona.add(tela);
+      cadeira(cx + ox, 0.3, mz + lado * 0.75, lado > 0 ? Math.PI : 0, '#3A3F46', zona);
+      const anel = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 32), new THREE.MeshBasicMaterial({ color: s.cor, transparent: true, opacity: 0.6, side: THREE.DoubleSide }));
+      anel.rotation.x = -Math.PI / 2; anel.position.set(cx + ox, 0.34, mz + lado * 0.75); zona.add(anel); aneis.push(anel);
+      s.mesas.push({ x: cx + ox, z: mz + lado * 0.75, rot: lado > 0 ? Math.PI : 0, zona, anel });
+      n++;
+    }
+  }
+  // quadro e vaso no fundo do setor
+  const fundoZ = cz + (linha === 0 ? -4.4 : 4.4);
+  caixa(2.4, 1.3, 0.06, '#FFFFFF', cx, 1.7, fundoZ, zona);
+  caixa(2.5, 0.06, 0.12, s.cor, cx, 1.02, fundoZ, zona);
+  for (const lx of [-1.1, 1.1]) caixa(0.05, 1.1, 0.05, '#B9BDC2', cx + lx, 0.85, fundoZ, zona);
+  vaso(cx + 2.7, 0.3, fundoZ, zona);
+  vaso(cx - 2.7, 0.3, cz + (linha === 0 ? 3.9 : -3.9), zona);
+  const et = etiqueta(s.nome, s.cor, '#ffffff', 0.9); et.userData.setor = s.id;
+  et.position.set(cx, 3.5, cz); terreo.add(et); etiquetasTerreo.push(et);
+  pickaveis.push(zona);
+});
+
+// Recepção e lounge (lado direito, piso terracota)
+const lounge = new THREE.Group(); lounge.userData.setor = 'lounge'; terreo.add(lounge);
+caixa(9, 0.03, 23, '#E9A178', 15, 0.315, 0, lounge);
+caixa(3.6, 1.05, 0.9, '#F4F4F2', 14, 0.82, 8.6, lounge); // balcão
+caixa(3.8, 0.06, 1.1, '#C8232B', 14, 1.37, 8.6, lounge);
+
+function sofa(x, z, rot, cor) {
+  const g = new THREE.Group(); g.position.set(x, 0.3, z); g.rotation.y = rot;
+  caixa(2.6, 0.45, 0.9, cor, 0, 0.3, 0, g); caixa(2.6, 0.55, 0.22, cor, 0, 0.75, -0.36, g);
+  caixa(0.2, 0.55, 0.9, cor, -1.3, 0.55, 0, g); caixa(0.2, 0.55, 0.9, cor, 1.3, 0.55, 0, g);
+  lounge.add(g);
+}
+sofa(15, -1.6, 0, '#E05A3A'); sofa(15, 2.2, Math.PI, '#E05A3A'); sofa(12.4, 0.3, Math.PI / 2, '#F2B32B');
+caixa(1.6, 0.35, 1, '#F7F5F2', 15, 0.55, 0.3, lounge);
+caixa(1.2, 0.04, 2.4, '#7A5A3A', 18.4, 1.1, 4.5, lounge); // bancada do café
+caixa(1.2, 0.8, 2.4, '#3A3F46', 18.4, 0.7, 4.5, lounge);
+caixa(0.35, 0.4, 0.3, '#C9CDD3', 18.4, 1.32, 4, lounge); // cafeteira
+vaso(11, 0.3, 10.8, lounge); vaso(19, 0.3, 10.8, lounge); vaso(11, 0.3, -5.5, lounge);
+// escada até o terraço
+for (let k = 0; k < 20; k++) caixa(2.4, 0.2, 0.32, '#D6D1C8', 18.1, 0.3 + 0.2 * k + 0.1, -11.4 + k * 0.32, lounge);
+const etLounge = etiqueta('Recepção e café', '#1F2328', '#F2B32B', 0.8);
+etLounge.position.set(15, 3.4, 4.5); terreo.add(etLounge); etiquetasTerreo.push(etLounge);
+pickaveis.push(lounge);
+
+
+// ---------- Funcionários (avatares sentados nas mesas) ----------
+const PELES = ['#F1C9A5', '#D9A47C', '#B07A52', '#8A5A3B', '#E8B98F'];
+const CABELOS = ['#2B1D14', '#5A3A22', '#1F1F1F', '#8C5A2B', '#C9A15A'];
+const etiquetasFunc = [];
+function avatar(x, y, z, rot, corRoupa, k, pai, dados, sentado = true) {
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; g.userData.func = dados;
+  const base = sentado ? 0.55 : 0.95;
+  caixa(0.46, 0.55, 0.3, corRoupa, 0, base + 0.3, sentado ? -0.05 : 0, g);         // tronco
+  if (sentado) { caixa(0.42, 0.14, 0.5, '#3A3F46', 0, base, 0.22, g); caixa(0.42, 0.45, 0.14, '#3A3F46', 0, 0.3, 0.45, g); }
+  else { caixa(0.18, 0.95, 0.2, '#3A3F46', -0.11, 0.47, 0, g); caixa(0.18, 0.95, 0.2, '#3A3F46', 0.11, 0.47, 0, g); }
+  for (const lx of [-0.29, 0.29]) caixa(0.12, 0.45, 0.14, corRoupa, lx, base + 0.32, sentado ? 0.12 : 0, g).rotation.x = sentado ? -0.9 : 0;
+  const cab = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), mat(PELES[k % 5])); cab.position.set(0, base + 0.8, 0); cab.castShadow = true; g.add(cab);
+  const cabelo = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(CABELOS[(k * 3) % 5])); cabelo.position.set(0, base + 0.84, -0.02); g.add(cabelo);
+  pai.add(g);
+  const et = etiqueta(dados.nome.split(' ')[0], '#ffffff', '#1F2328', 0.42);
+  et.position.set(x, y + base + 1.35, z); pai.add(et); etiquetasFunc.push(et); g.userData.et = et;
+  return g;
+}
+let kAv = 0;
+const NA_MESA = {}, NA_REUNIAO = {};
+for (const s of SETORES) s.funcionarios.forEach((f, i) => {
+  const m = s.mesas[i]; if (!m) return;
+  m.anel.visible = false; aneis.splice(aneis.indexOf(m.anel), 1);
+  NA_MESA[f.id] = avatar(m.x, 0.3, m.z, m.rot, s.cor, kAv++, m.zona, { ...f, setor: s.id });
+});
+const ASSISTENTE = { id: 'manolito', nome: 'Manolito', cargo: 'Seu assistente pessoal · chefe da equipe', status: 'Na recepção · pronto para conversar', setor: 'lounge' };
+NA_MESA.manolito = avatar(14, 0.3, 7.7, 0, '#F2B32B', 7, lounge, ASSISTENTE, false);
+
+// ---------- Andar de cima: laje, terraço e sala de reunião ----------
+caixa(BW + 0.4, 0.35, BD + 0.4, '#D9D4CC', 0, H + 0.475, 0, andar);
+caixa(BW, 0.06, BD, '#C89B6D', 0, H + 0.68, 0, andar); // deck
+const Y2 = H + 0.71;
+paredeVidro(-BW / 2, BD / 2, BW / 2, BD / 2, Y2, 1.1, andar);
+paredeVidro(-BW / 2, -BD / 2, BW / 2, -BD / 2, Y2, 1.1, andar);
+paredeVidro(-BW / 2, -BD / 2, -BW / 2, BD / 2, Y2, 1.1, andar);
+paredeVidro(BW / 2, -BD / 2, BW / 2, BD / 2, Y2, 1.1, andar);
+
+// fachada com o nome da loja
+const texFachada = texturaCanvas(1024, 128, (g, w, h) => {
+  g.fillStyle = '#C8232B'; g.fillRect(0, 0, w, h);
+  g.font = '800 82px "Bricolage Grotesque", sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'center';
+  g.fillStyle = '#ffffff'; g.fillText('KOIZAS', w / 2 - 150, h / 2 + 4); g.fillStyle = '#F2B32B'; g.fillText('DO LAR', w / 2 + 210, h / 2 + 4);
+});
+const fachada = new THREE.Mesh(new THREE.PlaneGeometry(9, 1.125), new THREE.MeshStandardMaterial({ map: texFachada }));
+fachada.position.set(-8, H + 0.47, BD / 2 + 0.21); andar.add(fachada);
+
+const reuniao = new THREE.Group(); reuniao.userData.setor = 'reuniao'; andar.add(reuniao);
+const RX0 = 2, RX1 = 18, RZ0 = -5, RZ1 = 5;
+caixa(RX1 - RX0, 0.04, RZ1 - RZ0, '#EFE6DA', (RX0 + RX1) / 2, Y2 + 0.02, 0, reuniao);
+paredeVidro(RX0, RZ0, RX1, RZ0, Y2, 3.2, reuniao);
+paredeVidro(RX0, RZ1, RX1, RZ1, Y2, 3.2, reuniao, [[8.4, 11.6]]);
+paredeVidro(RX0, RZ0, RX0, RZ1, Y2, 3.2, reuniao);
+paredeVidro(RX1, RZ0, RX1, RZ1, Y2, 3.2, reuniao);
+for (let x = RX0 + 0.5; x < RX1; x += 1) caixa(0.14, 0.18, RZ1 - RZ0 + 0.4, '#F4F4F2', x, Y2 + 3.3, 0, reuniao); // pergolado
+// mesa longa
+caixa(11.4, 0.12, 2.3, '#D9655B', 10, Y2 + 0.8, 0, reuniao);
+for (const x of [5.2, 10, 14.8]) caixa(0.5, 0.74, 1.2, '#3A3F46', x, Y2 + 0.37, 0, reuniao);
+const lugaresReuniao = [];
+for (let k = 0; k < 6; k++) {
+  const x = 5.4 + k * 1.84;
+  lugaresReuniao.push(cadeira(x, Y2, -1.65, 0, '#3A3F46', reuniao));
+  lugaresReuniao.push(cadeira(x, Y2, 1.65, Math.PI, '#3A3F46', reuniao));
+  caixa(0.5, 0.02, 0.34, '#2A2F36', x, Y2 + 0.87, -0.75, reuniao); // notebooks fechados
+  caixa(0.5, 0.02, 0.34, '#2A2F36', x, Y2 + 0.87, 0.75, reuniao);
+}
+cadeira(16.3, Y2, 0, -Math.PI / 2, '#F2B32B', reuniao); // cabeceira: o dono
+// lugares da equipe na reunião (aparecem só quando você chama todos)
+[['manolito', 14.6, 1.65, Math.PI, '#F2B32B'], ['mercado-0', 14.6, -1.65, 0, '#2F5D8A'], ['fornecedores-0', 12.76, -1.65, 0, '#1E7F6E'], ['arte-0', 12.76, 1.65, Math.PI, '#6B4FA0']].forEach(([id, x, z, r, cor], k) => {
+  const f = id === 'manolito' ? ASSISTENTE : SETORES.flatMap(s => s.funcionarios.map(fn => ({ ...fn, setor: s.id }))).find(fn => fn.id === id);
+  const g = avatar(x, Y2, z, r, cor, id === 'manolito' ? 7 : k - 1, reuniao, f);
+  NA_REUNIAO[id] = g; g.visible = false; g.userData.et.userData.off = true;
+});
+function emReuniao(sim) {
+  for (const id in NA_REUNIAO) {
+    NA_REUNIAO[id].visible = sim; NA_REUNIAO[id].userData.et.userData.off = !sim;
+    if (NA_MESA[id]) { NA_MESA[id].visible = !sim; NA_MESA[id].userData.et.userData.off = sim; }
+  }
+}
+// TV com a pauta
+const texPauta = texturaCanvas(1024, 576, (g, w, h) => {
+  g.fillStyle = '#1F2328'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#F2B32B'; g.font = '700 30px "Figtree", sans-serif'; g.fillText('PAUTA DE HOJE', 70, 92);
+  g.fillStyle = '#ffffff'; g.font = '800 64px "Bricolage Grotesque", sans-serif'; g.fillText('Montar a equipe', 70, 170);
+  const itens = [['1', 'Escritório pronto', true], ['2', '3 funcionários contratados', true], ['3', 'Primeiras tarefas da equipe', false], ['4', 'Integrações (mais tarde)', false]];
+  g.font = '500 40px "Figtree", sans-serif';
+  itens.forEach(([n, t, ok], i) => {
+    const y = 270 + i * 72;
+    g.fillStyle = ok ? '#2F7A4F' : '#3A3F46'; caminhoArredondado(g, 70, y - 34, 48, 48, 10); g.fill();
+    g.fillStyle = '#ffffff'; g.font = '700 30px "Figtree", sans-serif'; g.textAlign = 'center'; g.fillText(ok ? '✓' : n, 94, y + 1); g.textAlign = 'left';
+    g.font = '500 40px "Figtree", sans-serif'; g.fillStyle = ok ? '#9AA1A9' : '#ffffff'; g.fillText(t, 140, y + 4);
+  });
+});
+const tv = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.9), new THREE.MeshBasicMaterial({ map: texPauta, toneMapped: false }));
+tv.position.set(RX0 + 0.25, Y2 + 1.85, 0); tv.rotation.y = Math.PI / 2; reuniao.add(tv);
+caixa(0.1, 2.05, 3.56, '#16191D', RX0 + 0.19, Y2 + 1.85, 0, reuniao);
+caixa(0.6, 0.85, 3, '#7A5A3A', RX0 + 0.45, Y2 + 0.43, 0, reuniao);
+// painel com a marca na parede do fundo
+const texLogo = texturaCanvas(512, 320, (g, w, h) => {
+  g.fillStyle = '#C8232B'; g.fillRect(0, 0, w, h);
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = '#ffffff'; g.font = '800 92px "Bricolage Grotesque", sans-serif'; g.fillText('Koizas', w / 2, h / 2 - 34);
+  g.fillStyle = '#F2B32B'; g.font = '800 64px "Bricolage Grotesque", sans-serif'; g.fillText('do Lar', w / 2, h / 2 + 52);
+});
+const logo = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.625), new THREE.MeshBasicMaterial({ map: texLogo, toneMapped: false }));
+logo.position.set(10, Y2 + 2, RZ0 + 0.12); reuniao.add(logo);
+caixa(4.5, 0.85, 0.5, '#7A5A3A', 10, Y2 + 0.43, RZ0 + 0.4, reuniao);
+vaso(RX1 - 0.6, Y2, RZ0 + 0.6, reuniao); vaso(RX1 - 0.6, Y2, RZ1 - 0.6, reuniao);
+const etReuniao = etiqueta('Sala de reunião', '#1F2328', '#ffffff', 0.95);
+etReuniao.position.set(10, Y2 + 4.6, 0); andar.add(etReuniao);
+pickaveis.push(reuniao);
+
+// resto do terraço: jardim e espreguiçadeiras
+for (const [x, z] of [[-17, -9], [-17, 9], [-6, -9], [-6, 9], [0, 0]]) { caixa(2.2, 0.6, 2.2, '#B9AE9E', x, Y2 + 0.3, z, andar); arvore(x, z, 0.55, andar).position.y = Y2 + 0.6; }
+for (let k = 0; k < 4; k++) { caixa(0.8, 0.3, 2, '#F4F4F2', -15 + k * 2.4, Y2 + 0.25, 3.5, andar); caixa(0.8, 0.5, 0.3, '#F4F4F2', -15 + k * 2.4, Y2 + 0.55, 2.6, andar); }
+cilindro(0.05, 0.05, 2.4, '#3A3F46', -11.5, Y2 + 1.2, 6, andar, 8);
+const guarda = new THREE.Mesh(new THREE.ConeGeometry(1.8, 0.6, 12), mat('#F2B32B')); guarda.position.set(-11.5, Y2 + 2.5, 6); guarda.castShadow = true; andar.add(guarda);
+for (let k = 0; k < 3; k++) caixa(1.8, 0.1, 3.2, '#2F4A6B', -12 + k * 2.2, Y2 + 0.55, -6, andar, { roughness: 0.3, metalness: 0.4 }); // placas solares
+
+// ---------- Interface ----------
+const painel = document.getElementById('painel');
+const botoes = [...document.querySelectorAll('.vistas button')];
+document.getElementById('n-setores').textContent = SETORES.length;
+document.getElementById('n-mesas').textContent = SETORES.length * MESAS_POR_SETOR;
+document.getElementById('n-func').textContent = SETORES.reduce((t, s) => t + (s.funcionarios?.length || 0), 0);
+
+const lista = document.getElementById('lista-setores');
+for (const s of SETORES) {
+  const li = document.createElement('li');
+  li.innerHTML = `<button type="button"><i style="background:${s.cor}"></i>${s.nome}</button>`;
+  li.querySelector('button').addEventListener('click', () => focarSetor(s.id));
+  lista.appendChild(li);
+}
+
+function esc(t) { return String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function abrirPainel(html) { painel.innerHTML = html + '<button type="button" class="fechar" aria-label="Fechar">×</button>'; painel.hidden = false; painel.querySelector('.fechar').onclick = () => { painel.hidden = true; }; }
+
+function mostrarSetor(s) {
+  const vagas = Array.from({ length: MESAS_POR_SETOR }, (_, i) => s.funcionarios[i] ? s.funcionarios[i].nome + ' · ' + s.funcionarios[i].cargo : null);
+  abrirPainel(`
+    <div class="faixa" style="background:${s.cor}"></div>
+    <p class="tipo">Setor · térreo</p>
+    <h2>${esc(s.nome)}</h2>
+    <p class="sub">${esc(s.sub)}</p>
+    <p class="missao">${esc(s.missao)}</p>
+    <h3>Equipe (${s.funcionarios.length} de ${MESAS_POR_SETOR} mesas)</h3>
+    <ul>${vagas.map(v => v ? `<li class="vaga" style="border-style:solid">${esc(v)}<span class="tag">contratado</span></li>` : `<li class="vaga">Mesa livre<span class="tag">vaga aberta</span></li>`).join('')}</ul>
+    <h3>Tarefas</h3>
+    <div class="apis">${s.tarefas.map(a => `<span>${esc(a)}</span>`).join('')}</div>`);
+}
+function mostrarFunc(f) {
+  const s = SETORES.find(x => x.id === f.setor);
+  const cor = s ? s.cor : '#F2B32B';
+  const apis = s ? s.tarefas : ['Relatório do dia', 'Chamar reuniões', 'Distribuir tarefas'];
+  const missao = s ? s.missao : 'Seu assistente pessoal e chefe da equipe: acompanha o Lucas, o Paulo e a Camila, cobra as tarefas e chama a reunião. Diga "chame todos para uma reunião".';
+  abrirPainel(`
+    <div class="faixa" style="background:${cor}"></div>
+    <p class="tipo">${esc(s ? 'Setor ' + s.nome : 'Recepção')}</p>
+    <h2>${esc(f.nome)}</h2>
+    <p class="sub">${esc(f.cargo)}</p>
+    <p class="missao">${esc(missao)}</p>
+    <h3>Status</h3>
+    <ul><li class="vaga">${esc(f.status)}<span class="tag">disponível</span></li></ul>
+    <h3>Tarefas</h3>
+    <div class="apis">${apis.map(a => `<span>${esc(a)}</span>`).join('')}</div>
+    <div class="conversa">
+      <h3>Conversar com ${esc(f.nome.split(' ')[0])}</h3>
+      <div class="msgs"></div>
+      <button type="button" class="falar" style="background:${cor}">🎤 Toque para falar</button>
+      <form class="digitar"><input placeholder="ou digite aqui…" aria-label="Mensagem"><button>Enviar</button></form>
+    </div>`);
+  montarConversa(f);
+}
+
+// ---------- Voz: microfone (reconhecimento do Chrome) → Claude (função da Netlify) → fala ----------
+const HISTORICO = {};
+const VOZ = {
+  'manolito': { nomes: ['Antonio'], fem: false, tom: 1 },
+  'mercado-0': { nomes: ['Donato', 'Fabio', 'Julio', 'Antonio'], fem: false, tom: 1.08 },
+  'fornecedores-0': { nomes: ['Humberto', 'Nicolau', 'Valerio', 'Antonio'], fem: false, tom: 0.9 },
+  'arte-0': { nomes: ['Francisca', 'Thalita', 'Brenda', 'Leticia', 'Google'], fem: true, tom: 1 },
+};
+const Reconhecer = window.SpeechRecognition || window.webkitSpeechRecognition;
+let ouvinte = null, vozesPt = [];
+function carregarVozes() { if (window.speechSynthesis) vozesPt = speechSynthesis.getVoices().filter(v => v.lang.replace('_', '-').toLowerCase().startsWith('pt-br')); }
+if (window.speechSynthesis) { carregarVozes(); speechSynthesis.onvoiceschanged = carregarVozes; }
+const ehNatural = v => /natural|online|neural/i.test(v.name);
+const ehFem = v => /francisca|thalita|brenda|leticia|leila|manuela|yara|elza|giovanna|maria|luciana|google|female/i.test(v.name);
+function escolherVoz(id) {
+  const cfg = VOZ[id] || VOZ.manolito;
+  const ordem = [...vozesPt].sort((a, b) => ehNatural(b) - ehNatural(a));
+  return ordem.find(v => cfg.nomes.some(n => v.name.includes(n)) && (ehNatural(v) || !ordem.some(ehNatural)))
+    || ordem.find(v => ehFem(v) === cfg.fem) || ordem[0] || null;
+}
+function pegarPin() {
+  let pin = null; try { pin = localStorage.getItem('pin-escritorio'); } catch {}
+  if (!pin) { pin = prompt('PIN do escritório:'); if (pin) try { localStorage.setItem('pin-escritorio', pin); } catch {} }
+  return pin;
+}
+// voz humana (ElevenLabs pela função /api/voz); se não estiver configurada, cai na voz do navegador
+let vozServidor = true, audioAtual = null;
+function pedirAudio(texto, id) {
+  if (!vozServidor) return Promise.resolve(null);
+  let pin = null; try { pin = localStorage.getItem('pin-escritorio'); } catch {}
+  return fetch('/api/voz', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pin': pin || '' }, body: JSON.stringify({ texto, quem: id }) })
+    .then(r => { if (r.status === 501) vozServidor = false; return r.ok ? r.blob() : null; }).catch(() => null);
+}
+function calar() { if (audioAtual) { audioAtual.pause(); audioAtual = null; } if (window.speechSynthesis) speechSynthesis.cancel(); }
+async function falar(texto, id, audioPronto) {
+  const blob = await (audioPronto || pedirAudio(texto, id));
+  if (!blob) return falarTexto(texto, id);
+  return new Promise(fim => {
+    calar(); const a = audioAtual = new Audio(URL.createObjectURL(blob));
+    a.onended = a.onerror = () => { URL.revokeObjectURL(a.src); fim(); };
+    a.play().catch(fim);
+  });
+}
+// fala frase por frase (o Chrome corta falas longas) e avisa quando termina
+function falarTexto(texto, id) {
+  return new Promise(fim => {
+    if (!window.speechSynthesis) return fim();
+    const voz = escolherVoz(id), cfg = VOZ[id] || {};
+    const frases = String(texto).match(/[^.!?]+[.!?]*/g) || [texto];
+    frases.forEach((fr, i) => {
+      const u = new SpeechSynthesisUtterance(fr.trim());
+      u.lang = 'pt-BR'; u.voice = voz; u.rate = 1.15;
+      u.pitch = voz && ehNatural(voz) && voz.name.includes('Antonio') ? (cfg.tom || 1) : 1;
+      if (i === frases.length - 1) { u.onend = fim; u.onerror = fim; }
+      speechSynthesis.speak(u);
+    });
+  });
+}
+async function chamarApi(corpo) {
+  const pin = pegarPin(); if (!pin) throw new Error('Sem PIN.');
+  const r = await fetch('/api/conversar', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pin': pin }, body: JSON.stringify(corpo) });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401) { try { localStorage.removeItem('pin-escritorio'); } catch {} throw new Error('PIN errado, tente de novo.'); }
+  if (!r.ok) throw new Error(d.erro || 'Erro ' + r.status);
+  return d;
+}
+const NOMES = { 'manolito': 'Manolito', 'mercado-0': 'Lucas', 'fornecedores-0': 'Paulo', 'arte-0': 'Camila' };
+async function iniciarReuniao() {
+  calar();
+  emReuniao(true); irVista('reuniao');
+  abrirPainel(`<div class="faixa" style="background:#F2B32B"></div><p class="tipo">Terraço · 2º andar</p><h2>Reunião da equipe</h2>
+    <p class="sub">O Manolito conduz. Todos estão na sala.</p><div class="msgs" id="ata"><p>Preparando a pauta…</p></div>`);
+  const ata = painel.querySelector('#ata');
+  let d;
+  try { d = await chamarApi({ modo: 'reuniao' }); }
+  catch (e) { ata.innerHTML = `<p style="color:#B42318">${esc(e.message)}</p>`; return; }
+  const linhas = (d.falas || []).filter(l => NOMES[l.quem] && l.texto);
+  ata.innerHTML = linhas.map((l, i) => `<p data-i="${i}" style="opacity:.45"><b>${NOMES[l.quem]}:</b> ${esc(l.texto)}</p>`).join('');
+  painel.insertAdjacentHTML('beforeend', `<h3>Aguardando sua aprovação</h3><ul>${(d.pendentes || []).map(p => `<li class="vaga">${esc(p)}</li>`).join('')}</ul>
+    <div class="conversa"><h3>Responder ao Manolito</h3><div class="msgs"></div>
+    <button type="button" class="falar" style="background:#F2B32B">🎤 Toque para falar</button>
+    <form class="digitar"><input placeholder="ou digite aqui…" aria-label="Mensagem"><button>Enviar</button></form>
+    <button type="button" class="falar" id="encerrar" style="background:#5B6168;margin-top:8px">Encerrar reunião</button></div>`);
+  const hist = HISTORICO.manolito = HISTORICO.manolito || [];
+  hist.push({ role: 'user', content: 'Chame todos para uma reunião.' }, { role: 'assistant', content: 'Reunião feita. ' + linhas.map(l => NOMES[l.quem] + ': ' + l.texto).join(' ') });
+  montarConversa(ASSISTENTE, true);
+  painel.querySelector('#encerrar').onclick = () => { calar(); emReuniao(false); painel.hidden = true; };
+  let proximo = pedirAudio(linhas[0]?.texto, linhas[0]?.quem);
+  for (let i = 0; i < linhas.length; i++) {
+    if (!painel.contains(ata)) break;
+    const el = ata.querySelector(`[data-i="${i}"]`); el.style.opacity = 1; el.scrollIntoView({ block: 'nearest' });
+    const atual = proximo;
+    proximo = linhas[i + 1] ? pedirAudio(linhas[i + 1].texto, linhas[i + 1].quem) : null; // já prepara a próxima fala
+    await falar(linhas[i].texto, linhas[i].quem, atual);
+  }
+}
+function montarConversa(f, naReuniao = false) {
+  const id = f.id;
+  const hist = HISTORICO[id] = HISTORICO[id] || [];
+  const inicio = naReuniao ? hist.length : 0;
+  const caixa = painel.querySelector('.conversa .msgs'), botao = painel.querySelector('.conversa .falar'), form = painel.querySelector('form.digitar');
+  const pintar = () => { caixa.innerHTML = hist.slice(inicio).map(m => `<p class="${m.role === 'user' ? 'eu' : ''}">${esc(m.content)}</p>`).join(''); caixa.scrollTop = caixa.scrollHeight; };
+  pintar();
+  async function enviar(texto) {
+    texto = texto.trim(); if (!texto) return;
+    if (id === 'manolito' && !naReuniao && /reuni/i.test(texto)) return iniciarReuniao();
+    hist.push({ role: 'user', content: texto }); pintar();
+    botao.disabled = true; botao.textContent = 'Pensando…';
+    try {
+      const d = await chamarApi({ funcionario: id, mensagens: hist }).catch(e => { hist.pop(); throw e; });
+      hist.push({ role: 'assistant', content: d.texto });
+      if (painel.contains(caixa)) pintar();
+      falar(d.texto, id);
+    } catch (e) {
+      pintar(); caixa.insertAdjacentHTML('beforeend', `<p style="color:#B42318">${esc(e.message)}</p>`);
+    } finally { botao.disabled = false; botao.textContent = '🎤 Toque para falar'; }
+  }
+  form.onsubmit = e => { e.preventDefault(); const i = form.querySelector('input'); enviar(i.value); i.value = ''; };
+  if (!Reconhecer) { botao.textContent = 'Microfone indisponível neste navegador (use o Chrome)'; botao.disabled = true; return; }
+  botao.onclick = () => {
+    if (ouvinte) { ouvinte.stop(); return; }
+    calar();
+    ouvinte = new Reconhecer(); ouvinte.lang = 'pt-BR'; ouvinte.interimResults = false; ouvinte.maxAlternatives = 1;
+    botao.classList.add('ouvindo'); botao.textContent = 'Ouvindo… toque para parar';
+    ouvinte.onresult = e => enviar(e.results[0][0].transcript);
+    ouvinte.onerror = e => { if (e.error === 'not-allowed') alert('Permita o microfone no navegador para falar.'); };
+    ouvinte.onend = () => { ouvinte = null; botao.classList.remove('ouvindo'); if (!botao.disabled) botao.textContent = '🎤 Toque para falar'; };
+    ouvinte.start();
+  };
+}
+function mostrarReuniao() {
+  abrirPainel(`
+    <div class="faixa" style="background:#F2B32B"></div>
+    <p class="tipo">Terraço · 2º andar</p>
+    <h2>Sala de reunião</h2>
+    <p class="sub">${LUGARES_REUNIAO} lugares + a cabeceira amarela, que é a sua</p>
+    <p class="missao">Aqui cada setor vai apresentar as pendências do dia com opções de decisão. Você escolhe e o funcionário executa.</p>
+    <h3>Na parede</h3>
+    <div class="apis"><span>TV com a pauta do dia</span><span>Painel da marca</span></div>
+    <div class="conversa"><button type="button" class="falar" style="background:#F2B32B" id="chamar-reuniao">Chamar todos para a reunião</button></div>`);
+  painel.querySelector('#chamar-reuniao').onclick = iniciarReuniao;
+}
+function mostrarLounge() {
+  abrirPainel(`
+    <div class="faixa" style="background:#E9A178"></div>
+    <p class="tipo">Térreo</p>
+    <h2>Recepção e café</h2>
+    <p class="sub">Entrada, sofás e escada para o terraço</p>
+    <p class="missao">Área comum. Mais tarde pode virar a mesa do assistente geral, que abre o escritório e distribui as tarefas.</p>`);
+}
+
+// ---------- Câmera: vistas, foco e tour ----------
+let anim = null, tourAtivo = false;
+function voarPara(pos, alvo, seg = 1.5, fim) {
+  if (reduzMovimento) { camera.position.copy(pos); controls.target.copy(alvo); controls.update(); fim && fim(); return; }
+  anim = { p0: camera.position.clone(), a0: controls.target.clone(), p1: pos.clone(), a1: alvo.clone(), t0: performance.now(), d: seg * 1000, fim };
+}
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const VISTAS = {
+  geral: { pos: V(42, 32, 40), alvo: V(0, 2, 0), andar: true },
+  terreo: { pos: V(2, 36, 30), alvo: V(-2, 0, 1), andar: false },
+  reuniao: { pos: V(17.4, Y2 + 1.45, 0), alvo: V(4, Y2 + 0.9, 0), andar: true },
+};
+function marcar(nome) { botoes.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.vista === nome))); }
+function definirAndar(visivel) { if (andar.visible !== visivel) { andar.visible = visivel; renderer.shadowMap.needsUpdate = true; } }
+
+function irVista(nome) {
+  tourAtivo = false;
+  if (nome === 'tour') return iniciarTour();
+  const v = VISTAS[nome]; marcar(nome); definirAndar(v.andar);
+  voarPara(v.pos, v.alvo);
+  if (nome === 'reuniao') mostrarReuniao(); else painel.hidden = true;
+}
+function focarSetor(id) {
+  const s = SETORES.find(x => x.id === id); if (!s) return;
+  tourAtivo = false; marcar('terreo'); definirAndar(false);
+  const lado = s.centro.z < 0 ? -1 : 1;
+  voarPara(V(s.centro.x + 5, 10, s.centro.z + lado * 9.5), V(s.centro.x, 0.8, s.centro.z));
+  mostrarSetor(s);
+}
+
+const TOUR = [
+  { pos: V(14, 2.2, 30), alvo: V(14, 1.8, 10), andar: true, d: 2.2 },
+  { pos: V(14, 1.75, 9), alvo: V(12, 1.4, -2), andar: true, d: 2.4 },
+  { pos: V(9, 1.75, 0), alvo: V(-4, 1.2, -6), andar: true, d: 2.4 },
+  { pos: V(-4, 1.75, 0), alvo: V(-16, 1.2, 5), andar: true, d: 2.6 },
+  { pos: V(-18, 1.75, 0), alvo: V(-10, 1.2, -6), andar: true, d: 2.4 },
+  { pos: V(18, 7.5, 8), alvo: V(10, Y2 + 0.8, 0), andar: true, d: 3 },
+  { pos: V(17.4, Y2 + 1.45, 0), alvo: V(4, Y2 + 0.9, 0), andar: true, d: 2.2 },
+];
+function iniciarTour() {
+  marcar('tour'); painel.hidden = true; definirAndar(true); tourAtivo = true;
+  let i = 0;
+  const passo = () => {
+    if (!tourAtivo) return;
+    if (i >= TOUR.length) { tourAtivo = false; marcar('reuniao'); mostrarReuniao(); return; }
+    const p = TOUR[i++]; definirAndar(p.andar); voarPara(p.pos, p.alvo, p.d, passo);
+  };
+  passo();
+}
+controls.addEventListener('start', () => { if (anim || tourAtivo) { anim = null; if (tourAtivo) { tourAtivo = false; marcar(''); } } });
+botoes.forEach(b => b.addEventListener('click', () => irVista(b.dataset.vista)));
+
+// ---------- Clique em setores ----------
+const ray = new THREE.Raycaster(), ponteiro = new THREE.Vector2();
+let baixo = null;
+function acharAlvo(ev) {
+  const r = canvas.getBoundingClientRect();
+  ponteiro.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ponteiro, camera);
+  const alvos = andar.visible ? [...pickaveis, ...etiquetasTerreo, andar] : [...pickaveis, ...etiquetasTerreo];
+  for (const h of ray.intersectObjects(alvos, true)) {
+    if (!h.object.visible || h.object.material === vidro) continue;
+    let o = h.object;
+    while (o && !o.userData.setor && !o.userData.func) { if (o === andar) return null; o = o.parent; }
+    return o ? (o.userData.func || o.userData.setor) : null;
+  }
+  return null;
+}
+canvas.addEventListener('pointerdown', e => { baixo = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', e => {
+  if (!baixo || Math.hypot(e.clientX - baixo[0], e.clientY - baixo[1]) > 6) return;
+  const id = acharAlvo(e);
+  if (id && typeof id === 'object') mostrarFunc(id);
+  else if (id === 'reuniao') { marcar('reuniao'); voarPara(VISTAS.reuniao.pos, VISTAS.reuniao.alvo); mostrarReuniao(); }
+  else if (id === 'lounge') mostrarLounge();
+  else if (id) focarSetor(id);
+});
+let ultimoHover = 0;
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse' || e.buttons) return;
+  const t = performance.now(); if (t - ultimoHover < 80) return; ultimoHover = t;
+  canvas.style.cursor = acharAlvo(e) ? 'pointer' : 'grab';
+});
+window.addEventListener('keydown', e => { if (e.key === 'Escape') painel.hidden = true; });
+
+// ---------- Laço ----------
+function redimensionar() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h;
+  camera.fov = w < 640 ? 55 : 42; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', redimensionar); redimensionar();
+
+const relogio = new THREE.Clock();
+function quadro() {
+  const dt = Math.min(relogio.getDelta(), 0.05), t = relogio.elapsedTime;
+  if (anim) {
+    const k = Math.min((performance.now() - anim.t0) / anim.d, 1), e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    camera.position.lerpVectors(anim.p0, anim.p1, e); controls.target.lerpVectors(anim.a0, anim.a1, e);
+    if (k >= 1) { const f = anim.fim; anim = null; f && f(); }
+  }
+  if (!reduzMovimento) {
+    for (const c of carros) { c.s += c.v * dt; const [x, z, r] = posNaRua(c.s); c.g.position.set(x, 0, z); c.g.rotation.y = -r; }
+    const o = 0.45 + 0.35 * Math.sin(t * 2.2); for (const a of aneis) a.material.opacity = o;
+  } else carros.forEach(c => { const [x, z, r] = posNaRua(c.s); c.g.position.set(x, 0, z); c.g.rotation.y = -r; });
+  for (const et of [...etiquetasTerreo, etReuniao]) et.visible = camera.position.distanceTo(et.position) > 10;
+  for (const et of etiquetasFunc) et.visible = !et.userData.off && (et.parent.visible !== false) && camera.position.distanceTo(et.position) < 22; // placas somem de perto
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(quadro);
+}
+quadro();
+// objetos parados não recalculam a matriz a cada quadro
+scene.traverse(o => { if (!carros.some(c => c.g === o || o.parent === c.g)) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
+camera.matrixAutoUpdate = true;
+renderer.shadowMap.needsUpdate = true;
+document.getElementById('carregando').hidden = true;
+</script>
+</body>
+</html>
