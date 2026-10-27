@@ -666,6 +666,24 @@ function pegarPin() {
   if (!pin) { pin = prompt('PIN do escritório:'); if (pin) try { localStorage.setItem('pin-escritorio', pin); } catch {} }
   return pin;
 }
+// voz humana (ElevenLabs pela função /api/voz); se não estiver configurada, cai na voz do navegador
+let vozServidor = true, audioAtual = null;
+function pedirAudio(texto, id) {
+  if (!vozServidor) return Promise.resolve(null);
+  let pin = null; try { pin = localStorage.getItem('pin-escritorio'); } catch {}
+  return fetch('/api/voz', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pin': pin || '' }, body: JSON.stringify({ texto, quem: id }) })
+    .then(r => { if (r.status === 501) vozServidor = false; return r.ok ? r.blob() : null; }).catch(() => null);
+}
+function calar() { if (audioAtual) { audioAtual.pause(); audioAtual = null; } window.calar(); }
+async function falar(texto, id, audioPronto) {
+  const blob = await (audioPronto || pedirAudio(texto, id));
+  if (!blob) return falarTexto(texto, id);
+  return new Promise(fim => {
+    calar(); const a = audioAtual = new Audio(URL.createObjectURL(blob));
+    a.onended = a.onerror = () => { URL.revokeObjectURL(a.src); fim(); };
+    a.play().catch(fim);
+  });
+}
 // fala frase por frase (o Chrome corta falas longas) e avisa quando termina
 function falarTexto(texto, id) {
   return new Promise(fim => {
@@ -674,7 +692,7 @@ function falarTexto(texto, id) {
     const frases = String(texto).match(/[^.!?]+[.!?]*/g) || [texto];
     frases.forEach((fr, i) => {
       const u = new SpeechSynthesisUtterance(fr.trim());
-      u.lang = 'pt-BR'; u.voice = voz; u.rate = 1;
+      u.lang = 'pt-BR'; u.voice = voz; u.rate = 1.15;
       u.pitch = voz && ehNatural(voz) && voz.name.includes('Antonio') ? (cfg.tom || 1) : 1;
       if (i === frases.length - 1) { u.onend = fim; u.onerror = fim; }
       speechSynthesis.speak(u);
@@ -691,7 +709,7 @@ async function chamarApi(corpo) {
 }
 const NOMES = { 'manolito': 'Manolito', 'mercado-0': 'Lucas', 'fornecedores-0': 'Paulo', 'arte-0': 'Camila' };
 async function iniciarReuniao() {
-  speechSynthesis && speechSynthesis.cancel();
+  calar();
   emReuniao(true); irVista('reuniao');
   abrirPainel(`<div class="faixa" style="background:#F2B32B"></div><p class="tipo">Terraço · 2º andar</p><h2>Reunião da equipe</h2>
     <p class="sub">O Manolito conduz. Todos estão na sala.</p><div class="msgs" id="ata"><p>Preparando a pauta…</p></div>`);
@@ -709,11 +727,14 @@ async function iniciarReuniao() {
   const hist = HISTORICO.manolito = HISTORICO.manolito || [];
   hist.push({ role: 'user', content: 'Chame todos para uma reunião.' }, { role: 'assistant', content: 'Reunião feita. ' + linhas.map(l => NOMES[l.quem] + ': ' + l.texto).join(' ') });
   montarConversa(ASSISTENTE, true);
-  painel.querySelector('#encerrar').onclick = () => { speechSynthesis && speechSynthesis.cancel(); emReuniao(false); painel.hidden = true; };
+  painel.querySelector('#encerrar').onclick = () => { calar(); emReuniao(false); painel.hidden = true; };
+  let proximo = pedirAudio(linhas[0]?.texto, linhas[0]?.quem);
   for (let i = 0; i < linhas.length; i++) {
     if (!painel.contains(ata)) break;
     const el = ata.querySelector(`[data-i="${i}"]`); el.style.opacity = 1; el.scrollIntoView({ block: 'nearest' });
-    await falarTexto(linhas[i].texto, linhas[i].quem);
+    const atual = proximo;
+    proximo = linhas[i + 1] ? pedirAudio(linhas[i + 1].texto, linhas[i + 1].quem) : null; // já prepara a próxima fala
+    await falar(linhas[i].texto, linhas[i].quem, atual);
   }
 }
 function montarConversa(f, naReuniao = false) {
@@ -732,7 +753,7 @@ function montarConversa(f, naReuniao = false) {
       const d = await chamarApi({ funcionario: id, mensagens: hist }).catch(e => { hist.pop(); throw e; });
       hist.push({ role: 'assistant', content: d.texto });
       if (painel.contains(caixa)) pintar();
-      falarTexto(d.texto, id);
+      falar(d.texto, id);
     } catch (e) {
       pintar(); caixa.insertAdjacentHTML('beforeend', `<p style="color:#B42318">${esc(e.message)}</p>`);
     } finally { botao.disabled = false; botao.textContent = '🎤 Toque para falar'; }
@@ -741,7 +762,7 @@ function montarConversa(f, naReuniao = false) {
   if (!Reconhecer) { botao.textContent = 'Microfone indisponível neste navegador (use o Chrome)'; botao.disabled = true; return; }
   botao.onclick = () => {
     if (ouvinte) { ouvinte.stop(); return; }
-    speechSynthesis && speechSynthesis.cancel();
+    calar();
     ouvinte = new Reconhecer(); ouvinte.lang = 'pt-BR'; ouvinte.interimResults = false; ouvinte.maxAlternatives = 1;
     botao.classList.add('ouvindo'); botao.textContent = 'Ouvindo… toque para parar';
     ouvinte.onresult = e => enviar(e.results[0][0].transcript);
