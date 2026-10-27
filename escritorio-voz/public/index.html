@@ -483,17 +483,18 @@ function avatar(x, y, z, rot, corRoupa, k, pai, dados, sentado = true) {
   const cabelo = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(CABELOS[(k * 3) % 5])); cabelo.position.set(0, base + 0.84, -0.02); g.add(cabelo);
   pai.add(g);
   const et = etiqueta(dados.nome.split(' ')[0], '#ffffff', '#1F2328', 0.42);
-  et.position.set(x, y + base + 1.35, z); pai.add(et); etiquetasFunc.push(et);
+  et.position.set(x, y + base + 1.35, z); pai.add(et); etiquetasFunc.push(et); g.userData.et = et;
   return g;
 }
 let kAv = 0;
+const NA_MESA = {}, NA_REUNIAO = {};
 for (const s of SETORES) s.funcionarios.forEach((f, i) => {
   const m = s.mesas[i]; if (!m) return;
   m.anel.visible = false; aneis.splice(aneis.indexOf(m.anel), 1);
-  avatar(m.x, 0.3, m.z, m.rot, s.cor, kAv++, m.zona, { ...f, setor: s.id });
+  NA_MESA[f.id] = avatar(m.x, 0.3, m.z, m.rot, s.cor, kAv++, m.zona, { ...f, setor: s.id });
 });
-const ASSISTENTE = { id: 'manolito', nome: 'Manolito', cargo: 'Assistente geral', status: 'Na recepção · pronto para conversar', setor: 'lounge' };
-avatar(14, 0.3, 7.7, 0, '#F2B32B', 7, lounge, ASSISTENTE, false);
+const ASSISTENTE = { id: 'manolito', nome: 'Manolito', cargo: 'Seu assistente pessoal · chefe da equipe', status: 'Na recepção · pronto para conversar', setor: 'lounge' };
+NA_MESA.manolito = avatar(14, 0.3, 7.7, 0, '#F2B32B', 7, lounge, ASSISTENTE, false);
 
 // ---------- Andar de cima: laje, terraço e sala de reunião ----------
 caixa(BW + 0.4, 0.35, BD + 0.4, '#D9D4CC', 0, H + 0.475, 0, andar);
@@ -533,6 +534,18 @@ for (let k = 0; k < 6; k++) {
   caixa(0.5, 0.02, 0.34, '#2A2F36', x, Y2 + 0.87, 0.75, reuniao);
 }
 cadeira(16.3, Y2, 0, -Math.PI / 2, '#F2B32B', reuniao); // cabeceira: o dono
+// lugares da equipe na reunião (aparecem só quando você chama todos)
+[['manolito', 14.6, 1.65, Math.PI, '#F2B32B'], ['mercado-0', 14.6, -1.65, 0, '#2F5D8A'], ['fornecedores-0', 12.76, -1.65, 0, '#1E7F6E'], ['arte-0', 12.76, 1.65, Math.PI, '#6B4FA0']].forEach(([id, x, z, r, cor], k) => {
+  const f = id === 'manolito' ? ASSISTENTE : SETORES.flatMap(s => s.funcionarios.map(fn => ({ ...fn, setor: s.id }))).find(fn => fn.id === id);
+  const g = avatar(x, Y2, z, r, cor, id === 'manolito' ? 7 : k - 1, reuniao, f);
+  NA_REUNIAO[id] = g; g.visible = false; g.userData.et.userData.off = true;
+});
+function emReuniao(sim) {
+  for (const id in NA_REUNIAO) {
+    NA_REUNIAO[id].visible = sim; NA_REUNIAO[id].userData.et.userData.off = !sim;
+    if (NA_MESA[id]) { NA_MESA[id].visible = !sim; NA_MESA[id].userData.et.userData.off = sim; }
+  }
+}
 // TV com a pauta
 const texPauta = texturaCanvas(1024, 576, (g, w, h) => {
   g.fillStyle = '#1F2328'; g.fillRect(0, 0, w, h);
@@ -608,7 +621,7 @@ function mostrarFunc(f) {
   const s = SETORES.find(x => x.id === f.setor);
   const cor = s ? s.cor : '#F2B32B';
   const apis = s ? s.tarefas : ['Relatório do dia', 'Chamar reuniões', 'Distribuir tarefas'];
-  const missao = s ? s.missao : 'Abre o escritório, dá o relatório do dia, distribui tarefas e chama as reuniões. Vai conversar com você por voz.';
+  const missao = s ? s.missao : 'Seu assistente pessoal e chefe da equipe: acompanha o Lucas, o Paulo e a Camila, cobra as tarefas e chama a reunião. Diga "chame todos para uma reunião".';
   abrirPainel(`
     <div class="faixa" style="background:${cor}"></div>
     <p class="tipo">${esc(s ? 'Setor ' + s.nome : 'Recepção')}</p>
@@ -630,45 +643,95 @@ function mostrarFunc(f) {
 
 // ---------- Voz: microfone (reconhecimento do Chrome) → Claude (função da Netlify) → fala ----------
 const HISTORICO = {};
-const VOZ = { 'mercado-0': { tom: 0.9, fem: false }, 'fornecedores-0': { tom: 0.8, fem: false }, 'arte-0': { tom: 1.1, fem: true }, 'manolito': { tom: 1.0, fem: false } };
+const VOZ = {
+  'manolito': { nomes: ['Antonio'], fem: false, tom: 1 },
+  'mercado-0': { nomes: ['Donato', 'Fabio', 'Julio', 'Antonio'], fem: false, tom: 1.08 },
+  'fornecedores-0': { nomes: ['Humberto', 'Nicolau', 'Valerio', 'Antonio'], fem: false, tom: 0.9 },
+  'arte-0': { nomes: ['Francisca', 'Thalita', 'Brenda', 'Leticia', 'Google'], fem: true, tom: 1 },
+};
 const Reconhecer = window.SpeechRecognition || window.webkitSpeechRecognition;
-let ouvinte = null;
+let ouvinte = null, vozesPt = [];
+function carregarVozes() { if (window.speechSynthesis) vozesPt = speechSynthesis.getVoices().filter(v => v.lang.replace('_', '-').toLowerCase().startsWith('pt-br')); }
+if (window.speechSynthesis) { carregarVozes(); speechSynthesis.onvoiceschanged = carregarVozes; }
+const ehNatural = v => /natural|online|neural/i.test(v.name);
+const ehFem = v => /francisca|thalita|brenda|leticia|leila|manuela|yara|elza|giovanna|maria|luciana|google|female/i.test(v.name);
+function escolherVoz(id) {
+  const cfg = VOZ[id] || VOZ.manolito;
+  const ordem = [...vozesPt].sort((a, b) => ehNatural(b) - ehNatural(a));
+  return ordem.find(v => cfg.nomes.some(n => v.name.includes(n)) && (ehNatural(v) || !ordem.some(ehNatural)))
+    || ordem.find(v => ehFem(v) === cfg.fem) || ordem[0] || null;
+}
 function pegarPin() {
   let pin = null; try { pin = localStorage.getItem('pin-escritorio'); } catch {}
   if (!pin) { pin = prompt('PIN do escritório:'); if (pin) try { localStorage.setItem('pin-escritorio', pin); } catch {} }
   return pin;
 }
+// fala frase por frase (o Chrome corta falas longas) e avisa quando termina
 function falarTexto(texto, id) {
-  if (!window.speechSynthesis) return;
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(texto);
-  u.lang = 'pt-BR';
-  const vozes = speechSynthesis.getVoices().filter(v => v.lang.replace('_', '-').startsWith('pt-BR'));
-  const cfg = VOZ[id] || {};
-  const fem = vozes.filter(v => /francisca|maria|luciana|female|feminina/i.test(v.name));
-  const masc = vozes.filter(v => /antonio|daniel|male|masculin/i.test(v.name));
-  u.voice = (cfg.fem ? fem[0] : masc[0]) || vozes[0] || null;
-  u.pitch = cfg.tom || 1; u.rate = 1.05;
-  speechSynthesis.speak(u);
+  return new Promise(fim => {
+    if (!window.speechSynthesis) return fim();
+    const voz = escolherVoz(id), cfg = VOZ[id] || {};
+    const frases = String(texto).match(/[^.!?]+[.!?]*/g) || [texto];
+    frases.forEach((fr, i) => {
+      const u = new SpeechSynthesisUtterance(fr.trim());
+      u.lang = 'pt-BR'; u.voice = voz; u.rate = 1;
+      u.pitch = voz && ehNatural(voz) && voz.name.includes('Antonio') ? (cfg.tom || 1) : 1;
+      if (i === frases.length - 1) { u.onend = fim; u.onerror = fim; }
+      speechSynthesis.speak(u);
+    });
+  });
 }
-function montarConversa(f) {
+async function chamarApi(corpo) {
+  const pin = pegarPin(); if (!pin) throw new Error('Sem PIN.');
+  const r = await fetch('/api/conversar', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pin': pin }, body: JSON.stringify(corpo) });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401) { try { localStorage.removeItem('pin-escritorio'); } catch {} throw new Error('PIN errado, tente de novo.'); }
+  if (!r.ok) throw new Error(d.erro || 'Erro ' + r.status);
+  return d;
+}
+const NOMES = { 'manolito': 'Manolito', 'mercado-0': 'Lucas', 'fornecedores-0': 'Paulo', 'arte-0': 'Camila' };
+async function iniciarReuniao() {
+  speechSynthesis && speechSynthesis.cancel();
+  emReuniao(true); irVista('reuniao');
+  abrirPainel(`<div class="faixa" style="background:#F2B32B"></div><p class="tipo">Terraço · 2º andar</p><h2>Reunião da equipe</h2>
+    <p class="sub">O Manolito conduz. Todos estão na sala.</p><div class="msgs" id="ata"><p>Preparando a pauta…</p></div>`);
+  const ata = painel.querySelector('#ata');
+  let d;
+  try { d = await chamarApi({ modo: 'reuniao' }); }
+  catch (e) { ata.innerHTML = `<p style="color:#B42318">${esc(e.message)}</p>`; return; }
+  const linhas = (d.falas || []).filter(l => NOMES[l.quem] && l.texto);
+  ata.innerHTML = linhas.map((l, i) => `<p data-i="${i}" style="opacity:.45"><b>${NOMES[l.quem]}:</b> ${esc(l.texto)}</p>`).join('');
+  painel.insertAdjacentHTML('beforeend', `<h3>Aguardando sua aprovação</h3><ul>${(d.pendentes || []).map(p => `<li class="vaga">${esc(p)}</li>`).join('')}</ul>
+    <div class="conversa"><h3>Responder ao Manolito</h3><div class="msgs"></div>
+    <button type="button" class="falar" style="background:#F2B32B">🎤 Toque para falar</button>
+    <form class="digitar"><input placeholder="ou digite aqui…" aria-label="Mensagem"><button>Enviar</button></form>
+    <button type="button" class="falar" id="encerrar" style="background:#5B6168;margin-top:8px">Encerrar reunião</button></div>`);
+  const hist = HISTORICO.manolito = HISTORICO.manolito || [];
+  hist.push({ role: 'user', content: 'Chame todos para uma reunião.' }, { role: 'assistant', content: 'Reunião feita. ' + linhas.map(l => NOMES[l.quem] + ': ' + l.texto).join(' ') });
+  montarConversa(ASSISTENTE, true);
+  painel.querySelector('#encerrar').onclick = () => { speechSynthesis && speechSynthesis.cancel(); emReuniao(false); painel.hidden = true; };
+  for (let i = 0; i < linhas.length; i++) {
+    if (!painel.contains(ata)) break;
+    const el = ata.querySelector(`[data-i="${i}"]`); el.style.opacity = 1; el.scrollIntoView({ block: 'nearest' });
+    await falarTexto(linhas[i].texto, linhas[i].quem);
+  }
+}
+function montarConversa(f, naReuniao = false) {
   const id = f.id;
   const hist = HISTORICO[id] = HISTORICO[id] || [];
-  const caixa = painel.querySelector('.msgs'), botao = painel.querySelector('.falar'), form = painel.querySelector('form.digitar');
-  const pintar = () => { caixa.innerHTML = hist.map(m => `<p class="${m.role === 'user' ? 'eu' : ''}">${esc(m.content)}</p>`).join(''); caixa.scrollTop = caixa.scrollHeight; };
+  const inicio = naReuniao ? hist.length : 0;
+  const caixa = painel.querySelector('.conversa .msgs'), botao = painel.querySelector('.conversa .falar'), form = painel.querySelector('form.digitar');
+  const pintar = () => { caixa.innerHTML = hist.slice(inicio).map(m => `<p class="${m.role === 'user' ? 'eu' : ''}">${esc(m.content)}</p>`).join(''); caixa.scrollTop = caixa.scrollHeight; };
   pintar();
   async function enviar(texto) {
     texto = texto.trim(); if (!texto) return;
-    const pin = pegarPin(); if (!pin) return;
+    if (id === 'manolito' && !naReuniao && /reuni/i.test(texto)) return iniciarReuniao();
     hist.push({ role: 'user', content: texto }); pintar();
     botao.disabled = true; botao.textContent = 'Pensando…';
     try {
-      const r = await fetch('/api/conversar', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pin': pin }, body: JSON.stringify({ funcionario: id, mensagens: hist }) });
-      const d = await r.json().catch(() => ({}));
-      if (r.status === 401) { try { localStorage.removeItem('pin-escritorio'); } catch {} hist.pop(); throw new Error('PIN errado, tente de novo.'); }
-      if (!r.ok) { hist.pop(); throw new Error(d.erro || 'Erro ' + r.status); }
+      const d = await chamarApi({ funcionario: id, mensagens: hist }).catch(e => { hist.pop(); throw e; });
       hist.push({ role: 'assistant', content: d.texto });
-      if (painel.querySelector('.msgs') === caixa) pintar();
+      if (painel.contains(caixa)) pintar();
       falarTexto(d.texto, id);
     } catch (e) {
       pintar(); caixa.insertAdjacentHTML('beforeend', `<p style="color:#B42318">${esc(e.message)}</p>`);
@@ -695,7 +758,9 @@ function mostrarReuniao() {
     <p class="sub">${LUGARES_REUNIAO} lugares + a cabeceira amarela, que é a sua</p>
     <p class="missao">Aqui cada setor vai apresentar as pendências do dia com opções de decisão. Você escolhe e o funcionário executa.</p>
     <h3>Na parede</h3>
-    <div class="apis"><span>TV com a pauta do dia</span><span>Painel da marca</span></div>`);
+    <div class="apis"><span>TV com a pauta do dia</span><span>Painel da marca</span></div>
+    <div class="conversa"><button type="button" class="falar" style="background:#F2B32B" id="chamar-reuniao">Chamar todos para a reunião</button></div>`);
+  painel.querySelector('#chamar-reuniao').onclick = iniciarReuniao;
 }
 function mostrarLounge() {
   abrirPainel(`
@@ -812,7 +877,7 @@ function quadro() {
     const o = 0.45 + 0.35 * Math.sin(t * 2.2); for (const a of aneis) a.material.opacity = o;
   } else carros.forEach(c => { const [x, z, r] = posNaRua(c.s); c.g.position.set(x, 0, z); c.g.rotation.y = -r; });
   for (const et of [...etiquetasTerreo, etReuniao]) et.visible = camera.position.distanceTo(et.position) > 10;
-  for (const et of etiquetasFunc) et.visible = (et.parent.visible !== false) && camera.position.distanceTo(et.position) < 22; // placas somem de perto
+  for (const et of etiquetasFunc) et.visible = !et.userData.off && (et.parent.visible !== false) && camera.position.distanceTo(et.position) < 22; // placas somem de perto
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(quadro);
